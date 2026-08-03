@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" >
+<meta name="viewport" content="width=device-width, initial-scale=1.0" >
+<title>The Big Board · Made For Group · Week of 25 May 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-mark">Made For Group · Internal</div>
+    <h1 class="login-title">The <em>Big Board</em></h1>
+    <div class="login-sub">A clear week, well coordinated.</div>
+    <form id="login-form" autocomplete="off">
+      <div class="login-field">
+        <label for="login-user">Username</label>
+        <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" >
+      </div>
+      <div class="login-field">
+        <label for="login-pass">Password</label>
+        <input id="login-pass" type="password" autocomplete="current-password" >
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button type="submit" class="login-submit">Enter</button>
+    </form>
+    <div class="login-foot">Weekly resourcing · Mon 25 May 2026</div>
+  </div>
+</div>
+
+<div class="app locked" id="app">
+
+<header>
+  <div class="brand-row">
+    <div>
+      <div class="brand">The <em>Big Board</em></div>
+      <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-top: 8px;">
+        Made For Group · Weekly Resourcing
+      </div>
+    </div>
+    <div class="brand-meta">
+      <strong>WEEK OF 25 MAY 2026</strong>
+      Coordinated by State Leads · Issued Monday 11:00 AM
+      <button type="button" id="print-issue-btn" class="print-issue-btn">Print Monday issue</button>
+    </div>
+  </div>
+  <nav id="nav">
+    <button data-view="overview" class="active">Overview</button>
+    <button data-view="calendar">Calendar</button>
+    <button data-view="opportunities">Opportunities</button>
+    <button data-view="people">People</button>
+    <button data-view="projects">Projects</button>
+    <button data-view="todo">To-Do Board</button>
+    <button data-view="support">Design Support</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ================ OVERVIEW ================ -->
+  <section class="view active" id="view-overview">
+    <div class="overview-grid">
+      <div>
+        <h1 class="overview-hero">A clear week, <em>well coordinated</em>, makes the work possible.</h1>
+        <div class="metrics" id="metrics"></div>
+        <div class="section-title">Hyper Priorities · This Week</div>
+        <div id="hyper-list"></div>
+        <div class="section-title" style="margin-top:36px;">Moved this week · Audit</div>
+        <div class="week-delta" id="week-delta-list"></div>
+      </div>
+      <aside>
+        <div class="week-questions">
+          <h3>The six questions, every week.</h3>
+          <ol>
+            <li>Did anything that was supposed to be completed last week not get finished? Why?</li>
+            <li>What's your key priority for the week ahead? What resource or assistance do you need to deliver it?</li>
+            <li>What are your key project dates for this month?</li>
+            <li>Do you have any new projects to add, and key information?</li>
+            <li>Is there a hyper priority for you this week?</li>
+            <li>Have any critical descriptions or dates on your projects changed?</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ================ CALENDAR ================ -->
+  <section class="view" id="view-calendar">
+    <div class="calendar-container">
+      <div class="cal-header">
+        <div>
+          <div class="cal-title">Five week view</div>
+          <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
+            Last week · This week · Next three weeks · Mon–Sat
+          </div>
+        </div>
+        <div class="cal-legend">
+          <span><span class="swatch green"></span> Opportunities</span>
+          <span><span class="swatch blue"></span> Front End</span>
+          <span><span class="swatch lilac"></span> Documentation</span>
+          <span><span class="swatch sand"></span> Design Support</span>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================ OPPORTUNITIES ================ -->
+  <section class="view" id="view-opportunities">
+    <div class="cal-header">
+      <div>
+        <div class="cal-title">Opportunities &amp; Feasibilities</div>
+        <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
+          Pitches and RFP work · Associate-led or higher
+        </div>
+      </div>
+    </div>
+    <div class="opp-controls">
+      <div class="opp-controls-left">
+        <span class="opp-sort-label">Sort by</span>
+        <select id="opp-sort" class="opp-sort-select">
+          <option value="heat">Heat (hottest first)</option>
+          <option value="lead">Project Lead</option>
+          <option value="value">Value (highest first)</option>
+        </select>
+      </div>
+      <button id="opp-new-btn" class="todo-btn primary">+ New Opportunity</button>
+    </div>
+    <div class="forecast-strip" id="opp-forecast"></div>
+    <div class="opp-grid" id="opp-grid"></div>
+    <div id="opp-archived" class="opp-archived-section" style="display:none;">
+      <div class="opp-archived-head">
+        <h3>Lost &amp; Archived</h3>
+        <span class="count" id="opp-archived-count"></span>
+      </div>
+      <div class="opp-archived-grid" id="opp-archived-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================ PEOPLE ================ -->
+  <section class="view" id="view-people">
+    <div class="people-intro">
+      <div>
+        <h2>People &amp; Load</h2>
+        <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
+          10 half-day blocks / week · Hover for detail
+        </div>
+      </div>
+      <div class="people-intro-right">
+        <label class="scenario-toggle">
+          <input type="checkbox" id="scenario-toggle" >
+          <span>If we win Hot + Cookin'</span>
+        </label>
+        <div class="cal-legend">
+          <span><span class="swatch green"></span> OPP</span>
+          <span><span class="swatch blue"></span> FED</span>
+          <span><span class="swatch lilac"></span> DOC</span>
+          <span><span class="swatch sand"></span> DS</span>
+        </div>
+      </div>
+    </div>
+    <div class="scenario-summary" id="scenario-summary" hidden></div>
+    <div id="leads-list"></div>
+
+    <div class="team-section">
+      <div class="section-title">Team Members · Block Allocations</div>
+      <div class="team-grid" id="team-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================ PROJECTS (BILLING / PIPELINE) ================ -->
+  <section class="view" id="view-projects">
+    <div class="proj-header">
+      <div>
+        <div class="cal-title">Projects</div>
+        <div class="proj-header-meta">
+          Stage pipelines &amp; values · For accounts &amp; invoicing · Grouped by master stage
+        </div>
+      </div>
+      <div class="proj-totals">
+        <div class="proj-total">
+          Portfolio value
+          <strong id="proj-total-portfolio">—</strong>
+        </div>
+        <div class="proj-total">
+          Remaining
+          <strong id="proj-total-remaining">—</strong>
+        </div>
+        <div class="proj-total moved">
+          Moved this week
+          <strong id="proj-total-moved">—</strong>
+        </div>
+        <div class="proj-total invoice">
+          Ready to invoice
+          <strong id="proj-total-invoice">—</strong>
+        </div>
+        <button id="proj-new-btn" class="todo-btn primary" style="align-self: flex-end; margin-left: 8px;">+ New Project</button>
+      </div>
+    </div>
+    <div class="invoice-queue" id="invoice-queue"></div>
+    <div id="proj-groups"></div>
+  </section>
+
+  <!-- ================ TO-DO BOARD ================ -->
+  <section class="view" id="view-todo">
+    <div class="todo-header">
+      <div>
+        <div class="cal-title">Studio To-Do Board</div>
+        <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
+          One column per person · Drag tasks to reorder · Tick to complete · 2h / 4h / day blocks only
+        </div>
+      </div>
+      <div class="todo-tools">
+        <span class="todo-tools-label" id="todo-mode-label">Viewing as MJ · Lead permissions</span>
+        <button id="todo-add-btn" class="todo-btn">+ Add Task</button>
+      </div>
+    </div>
+    <div class="todo-board-wrap">
+      <div class="todo-board" id="todo-board"></div>
+    </div>
+  </section>
+
+  <!-- ================ DESIGN SUPPORT ================ -->
+  <section class="view" id="view-support">
+    <div class="cal-header">
+      <div>
+        <div class="cal-title">Design Support</div>
+        <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
+          On site · Sorted by Practical Completion date
+        </div>
+      </div>
+    </div>
+    <div class="ds-layout">
+      <div class="ds-list" id="ds-list"></div>
+      <div class="ds-cal-stack" id="ds-cal-stack"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <span>Made For Group · The Big Board v1.1</span>
+  <span>For internal team use · Printed weekly</span>
+  <button type="button" id="reset-demo-btn" class="reset-demo-btn">Reset demo data</button>
+</footer>
+
+</div>
+
+<!-- Add Task Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Task</h3>
+      <button id="modal-close" class="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="m-label">Assign to</label>
+      <select id="m-person" class="m-input"></select>
+
+      <label class="m-label">Project</label>
+      <select id="m-project" class="m-input"></select>
+
+      <label class="m-label">Description <span class="m-hint">(max 50 words)</span></label>
+      <textarea id="m-desc" class="m-input" rows="3" maxlength="400" placeholder="What needs doing?"></textarea>
+      <div class="m-word-count"><span id="m-words">0</span> / 50 words</div>
+
+      <label class="m-label">Time block</label>
+      <div class="m-block-picker" id="m-blocks">
+        <button data-block="2h" class="m-block">2 hours</button>
+        <button data-block="4h" class="m-block">4 hours</button>
+        <button data-block="day" class="m-block">Whole day (8h)</button>
+      </div>
+
+      <label class="m-label">When</label>
+      <div class="m-when-picker">
+        <button data-when="week" class="m-when active">This week</button>
+        <button data-when="future" class="m-when">Future</button>
+      </div>
+
+      <div id="m-multi-row" class="m-multi-row" style="display:none;">
+        <label class="m-label">Number of blocks <span class="m-hint">(multiple days)</span></label>
+        <input type="number" id="m-multi" class="m-input" min="1" max="10" value="1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="m-cancel" class="todo-btn ghost">Cancel</button>
+      <button id="m-save" class="todo-btn primary">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Project Modal -->
+<div class="modal-overlay" id="proj-modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h3>Create New Project</h3>
+      <button id="proj-modal-close" class="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="m-label">Project name</label>
+      <input id="pm-name" class="m-input" type="text" placeholder="e.g. Boutique hotel — Fitzroy" >
+
+      <label class="m-label">Client</label>
+      <input id="pm-client" class="m-input" type="text" placeholder="Client name" >
+
+      <label class="m-label">Master stage</label>
+      <select id="pm-master" class="m-input">
+        <option value="opportunity">Opportunities &amp; Feasibilities</option>
+        <option value="frontend" selected>Front End Design</option>
+        <option value="documentation">Documentation</option>
+        <option value="support">Design Support</option>
+      </select>
+
+      <label class="m-label">Pipeline · sub-stages &amp; values <span class="m-hint">(edit, remove or add)</span></label>
+      <div id="pm-stages"></div>
+      <button id="pm-add-stage" class="pb-add-stage" type="button">+ Add sub-stage</button>
+      <div class="pb-total-row">
+        <span>Total project value</span>
+        <strong id="pm-total">$0</strong>
+      </div>
+
+      <label class="m-label">Lead</label>
+      <select id="pm-lead" class="m-input"></select>
+
+      <label class="m-label">Team <span class="m-hint">(click to toggle)</span></label>
+      <div id="pm-team" class="proj-team-picker"></div>
+
+      <label class="m-label">Short description <span class="m-hint">(one line, max 25 words)</span></label>
+      <textarea id="pm-blurb" class="m-input" rows="2" placeholder="One line describing the project"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button id="pm-cancel" class="todo-btn ghost">Cancel</button>
+      <button id="pm-save" class="todo-btn primary">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Opportunity Modal -->
+<div class="modal-overlay" id="opp-modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="opp-modal-title">New Opportunity</h3>
+      <button id="opp-modal-close" class="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <label class="m-label">Opportunity name</label>
+      <input id="om-name" class="m-input" type="text" placeholder="e.g. Boutique hotel — Fitzroy" >
+
+      <label class="m-label">Client / Source</label>
+      <input id="om-client" class="m-input" type="text" placeholder="Client or referrer" >
+
+      <label class="m-label">Project Lead</label>
+      <select id="om-lead" class="m-input"></select>
+
+      <label class="m-label">Estimated value <span class="m-hint">(AUD)</span></label>
+      <input id="om-value" class="m-input" type="number" min="0" step="1000" value="25000" >
+
+      <label class="m-label">Description <span class="m-hint">(max 50 words)</span></label>
+      <textarea id="om-desc" class="m-input" rows="3" placeholder="Brief context — what is the opportunity?"></textarea>
+
+      <label class="m-label">Stage close <span class="m-hint">(expected pitch / decision date)</span></label>
+      <input id="om-close" class="m-input" type="date" >
+
+      <label class="m-label">Heat <span class="m-hint">(how warm is this?)</span></label>
+      <div class="heat-stops" id="om-heat">
+        <button type="button" class="heat-stop" data-heat="cool">Cool</button>
+        <button type="button" class="heat-stop" data-heat="simmer">Simmer</button>
+        <button type="button" class="heat-stop" data-heat="hot">Hot</button>
+        <button type="button" class="heat-stop" data-heat="cookin">Cookin'</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="om-cancel" class="todo-btn ghost">Cancel</button>
+      <button id="om-save" class="todo-btn primary">Add Opportunity</button>
+    </div>
+  </div>
+</div>
+
+<!-- Convert Won Opportunity → Project Modal -->
+<div class="modal-overlay" id="won-modal-overlay">
+  <div class="modal wide">
+    <div class="modal-header">
+      <h3>Won! Convert to Project</h3>
+      <button id="won-modal-close" class="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--paper-2);padding:14px 16px;border-left:3px solid var(--green);margin-bottom:18px;">
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:4px;">Converting</div>
+        <div id="wm-summary" style="font-family:var(--font-display);font-size:18px;line-height:1.2;"></div>
+      </div>
+
+      <label class="m-label">Project name <span class="m-hint">(can adjust from opportunity)</span></label>
+      <input id="wm-name" class="m-input" type="text" >
+
+      <label class="m-label">Client</label>
+      <input id="wm-client" class="m-input" type="text" >
+
+      <label class="m-label">Master stage <span class="m-hint">(where does the work begin?)</span></label>
+      <select id="wm-master" class="m-input">
+        <option value="frontend" selected>Front End Design</option>
+        <option value="documentation">Documentation</option>
+        <option value="support">Design Support</option>
+      </select>
+
+      <label class="m-label">Pipeline · sub-stages &amp; values</label>
+      <div id="wm-stages"></div>
+      <button id="wm-add-stage" class="pb-add-stage" type="button">+ Add sub-stage</button>
+      <div class="pb-total-row">
+        <span>Total project value</span>
+        <strong id="wm-total">$0</strong>
+      </div>
+
+      <label class="m-label">Lead</label>
+      <select id="wm-lead" class="m-input"></select>
+
+      <label class="m-label">Team <span class="m-hint">(click to toggle)</span></label>
+      <div id="wm-team" class="proj-team-picker"></div>
+    </div>
+    <div class="modal-footer">
+      <button id="wm-cancel" class="todo-btn ghost">Cancel</button>
+      <button id="wm-save" class="todo-btn primary">Convert to Project</button>
+    </div>
+  </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<!-- First-run onboarding -->
+<div class="onboard-overlay" id="onboard-overlay">
+  <div class="onboard-card">
+    <div class="onboard-mark">The Big Board</div>
+    <div class="onboard-step active">
+      <h2>Monday 11am ritual</h2>
+      <p>State leads update the board once a week — not continuously. Clarity beats completeness.</p>
+    </div>
+    <div class="onboard-step">
+      <h2>Heat is the pipeline knob</h2>
+      <p>Cool / Simmer / Hot / Cookin' drive the weighted forecast. No free-text sprawl.</p>
+    </div>
+    <div class="onboard-step">
+      <h2>Blocks are half-days</h2>
+      <p>Ten blocks per person per week. Under 60% underused · 60–90% healthy · over 90% at risk.</p>
+    </div>
+    <div class="onboard-dots">
+      <span class="onboard-dot active"></span>
+      <span class="onboard-dot"></span>
+      <span class="onboard-dot"></span>
+    </div>
+    <div class="onboard-actions">
+      <button type="button" id="onboard-skip" class="todo-btn ghost">Skip</button>
+      <button type="button" id="onboard-next" class="todo-btn primary">Next</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/constants.js"></script>
+<script src="js/data.js"></script>
+<script src="js/audit.js"></script>
+<script src="js/forecast.js"></script>
+<script src="js/invoice.js"></script>
+<script src="js/capacity.js"></script>
+<script src="js/aging.js"></script>
+<script src="js/print.js"></script>
+<script src="js/onboarding.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
