@@ -160,6 +160,82 @@ function togglePipelineStage(project, stageKey) {
   }
 }
 
+function csvEscape(val) {
+  const s = String(val == null ? "" : val);
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+/**
+ * Build a Xero-friendly invoice import CSV from the open queue.
+ * Import path: Xero → Business → Invoices → Import.
+ */
+function buildXeroInvoiceCsv(items) {
+  const headers = [
+    "ContactName",
+    "InvoiceNumber",
+    "InvoiceDate",
+    "DueDate",
+    "Description",
+    "Quantity",
+    "UnitAmount",
+    "AccountCode",
+    "TaxType",
+    "Reference",
+  ];
+  const rows = [headers.join(",")];
+  items.forEach((item, idx) => {
+    const project = (typeof PROJECTS !== "undefined")
+      ? PROJECTS.find(p => p.id === item.projectId)
+      : null;
+    const contact = (project && project.client) || item.name || "Made For client";
+    const invNum = "BB-" + (item.closedDate || WEEK_OF).replace(/-/g, "") + "-" + String(idx + 1).padStart(3, "0");
+    const invDate = item.closedDate || WEEK_OF;
+    let due = invDate;
+    try {
+      const d = new Date(invDate + "T00:00:00");
+      d.setDate(d.getDate() + 14);
+      due = d.toISOString().slice(0, 10);
+    } catch (_) {}
+    const desc = item.code + " — " + item.label;
+    const ref = item.code + " / " + item.label;
+    rows.push([
+      csvEscape(contact),
+      csvEscape(invNum),
+      csvEscape(invDate),
+      csvEscape(due),
+      csvEscape(desc),
+      "1",
+      csvEscape(item.value),
+      "200",
+      "OUTPUT",
+      csvEscape(ref),
+    ].join(","));
+  });
+  return rows.join("\n");
+}
+
+function downloadXeroInvoiceCsv() {
+  const open = getOpenInvoiceQueue();
+  if (!open.length) {
+    if (typeof showToast === "function") showToast("Nothing to export", { tone: "neutral" });
+    return;
+  }
+  const csv = buildXeroInvoiceCsv(open);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "big-board-xero-invoices-" + WEEK_OF + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  if (typeof showToast === "function") {
+    showToast("Exported " + open.length + " row" + (open.length === 1 ? "" : "s") + " for Xero", { tone: "success" });
+  }
+}
+
 function renderInvoiceQueue(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -178,8 +254,11 @@ function renderInvoiceQueue(containerId) {
 
   el.innerHTML = `
     <div class="invoice-queue-head">
-      <span class="invoice-queue-title">Ready to invoice</span>
-      <span class="invoice-queue-sub">Closed sub-stages awaiting accounts</span>
+      <div>
+        <span class="invoice-queue-title">Ready to invoice</span>
+        <div class="invoice-queue-sub">Closed sub-stages awaiting accounts · Import CSV in Xero → Business → Invoices → Import</div>
+      </div>
+      <button type="button" class="todo-btn" id="xero-export-btn">Export to Xero (CSV)</button>
     </div>
     <div class="invoice-queue-list">
       ${open.map(i => `
@@ -194,12 +273,18 @@ function renderInvoiceQueue(containerId) {
     </div>
   `;
 
+  const exportBtn = document.getElementById("xero-export-btn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", downloadXeroInvoiceCsv);
+  }
+
   el.querySelectorAll(".inv-mark").forEach(btn => {
     btn.addEventListener("click", () => {
       const row = btn.closest(".invoice-row");
       markInvoiced(row.dataset.invoiceId);
       if (typeof renderProjects === "function") renderProjects();
       if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
+      if (typeof showToast === "function") showToast("Marked invoiced", { tone: "success", duration: 2000 });
     });
   });
 }

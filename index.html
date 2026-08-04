@@ -4,58 +4,97 @@
 <meta charset="UTF-8" >
 <meta name="viewport" content="width=device-width, initial-scale=1.0" >
 <title>The Big Board · Made For Group · Week of 25 May 2026</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet">
-
-
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <div class="login-screen" id="login-screen">
-  <div class="login-card">
-    <div class="login-mark">Made For Group · Internal</div>
-    <h1 class="login-title">The <em>Big Board</em></h1>
-    <div class="login-sub">A clear week, well coordinated.</div>
-    <form id="login-form" autocomplete="off">
-      <div class="login-field">
-        <label for="login-user">Username</label>
-        <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" >
+  <div class="login-shell">
+    <aside class="login-stage" aria-hidden="true">
+      <div class="login-stage-grid"></div>
+      <div class="login-stage-copy">
+        <div class="login-stage-eyebrow">Operating system · Studio</div>
+        <h2>One board.<br><em>Every Monday.</em></h2>
+        <p>Heat, capacity, pipeline, and hyper priorities — coordinated once a week so the work can move.</p>
+        <ul class="login-stage-stats">
+          <li><strong>10</strong><span>blocks / person</span></li>
+          <li><strong>6</strong><span>weekly questions</span></li>
+          <li><strong>1</strong><span>Monday ritual</span></li>
+        </ul>
       </div>
-      <div class="login-field">
-        <label for="login-pass">Password</label>
-        <input id="login-pass" type="password" autocomplete="current-password" >
-      </div>
-      <div class="login-error" id="login-error"></div>
-      <button type="submit" class="login-submit">Enter</button>
-    </form>
-    <div class="login-foot">Weekly resourcing · Mon 25 May 2026</div>
+    </aside>
+    <div class="login-card">
+      <div class="login-mark">Made For Group · Internal</div>
+      <h1 class="login-title">The <em>Big Board</em></h1>
+      <div class="login-sub">A clear week, well coordinated.</div>
+      <form id="login-form" autocomplete="off">
+        <div class="login-field">
+          <label for="login-user">Username</label>
+          <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="mitchj" >
+        </div>
+        <div class="login-field">
+          <label for="login-pass">Password</label>
+          <input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" >
+        </div>
+        <div class="login-error" id="login-error" role="alert"></div>
+        <button type="submit" class="login-submit">Enter the board</button>
+      </form>
+      <div class="login-foot">Weekly resourcing · Week of 25 May 2026</div>
+    </div>
   </div>
 </div>
 
 <div class="app locked" id="app">
 
-<header>
-  <div class="brand-row">
-    <div>
+<header class="app-chrome">
+  <div class="chrome-bar">
+    <div class="chrome-brand">
       <div class="brand">The <em>Big Board</em></div>
-      <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-top: 8px;">
-        Made For Group · Weekly Resourcing
+      <div class="chrome-sub">Made For Group · Weekly Resourcing</div>
+    </div>
+
+    <button type="button" class="cmd-trigger" id="cmd-trigger" title="Search (⌘K)">
+      <span class="cmd-trigger-icon" aria-hidden="true">⌕</span>
+      <span class="cmd-trigger-label">Search board…</span>
+      <kbd>⌘K</kbd>
+    </button>
+
+    <div class="chrome-actions">
+      <div class="live-pill" title="Demo week anchored to Monday">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span>Live · Wk 25 May</span>
+      </div>
+      <div class="brand-meta">
+        <strong>WEEK OF 25 MAY 2026</strong>
+        <span class="brand-meta-line">State Leads · Issued Mon 11:00</span>
+        <button type="button" id="print-issue-btn" class="print-issue-btn">Print Monday issue</button>
+      </div>
+      <div class="user-menu" id="user-menu">
+        <button type="button" class="user-chip" id="user-chip" aria-haspopup="true" aria-expanded="false">
+          <span class="user-avatar">MJ</span>
+          <span class="user-meta">
+            <span class="user-name">Mitch J</span>
+            <span class="user-role">State Lead</span>
+          </span>
+          <span class="user-caret" aria-hidden="true">▾</span>
+        </button>
+        <div class="user-dropdown" id="user-dropdown" hidden>
+          <div class="user-dropdown-head">Signed in as mitchj</div>
+          <button type="button" class="user-dropdown-item" id="user-print">Print Monday issue</button>
+          <button type="button" class="user-dropdown-item danger" id="user-logout">Sign out</button>
+        </div>
       </div>
     </div>
-    <div class="brand-meta">
-      <strong>WEEK OF 25 MAY 2026</strong>
-      Coordinated by State Leads · Issued Monday 11:00 AM
-      <button type="button" id="print-issue-btn" class="print-issue-btn">Print Monday issue</button>
-    </div>
   </div>
-  <nav id="nav">
-    <button data-view="overview" class="active">Overview</button>
-    <button data-view="calendar">Calendar</button>
-    <button data-view="opportunities">Opportunities</button>
-    <button data-view="people">People</button>
-    <button data-view="projects">Projects</button>
-    <button data-view="todo">To-Do Board</button>
-    <button data-view="support">Design Support</button>
+  <nav id="nav" class="app-nav" aria-label="Primary">
+    <button data-view="overview" class="active"><span>Overview</span></button>
+    <button data-view="calendar"><span>Key Dates</span></button>
+    <button data-view="opportunities"><span>Opportunities</span></button>
+    <button data-view="people"><span>People</span></button>
+    <button data-view="projects"><span>Projects</span></button>
+    <button data-view="todo"><span>To-Do Board</span></button>
+    <button data-view="support"><span>Design Support</span></button>
   </nav>
 </header>
 
@@ -65,6 +104,12 @@
   <section class="view active" id="view-overview">
     <div class="overview-grid">
       <div>
+        <div class="board-ribbon">
+          <span class="board-ribbon-live"><span class="live-dot"></span> Board live</span>
+          <span>Monday ritual · State leads</span>
+          <span class="board-ribbon-sep">·</span>
+          <span>Week of 25 May 2026</span>
+        </div>
         <h1 class="overview-hero">A clear week, <em>well coordinated</em>, makes the work possible.</h1>
         <div class="metrics" id="metrics"></div>
         <div class="section-title">Hyper Priorities · This Week</div>
@@ -88,14 +133,14 @@
     </div>
   </section>
 
-  <!-- ================ CALENDAR ================ -->
+  <!-- ================ KEY DATES ================ -->
   <section class="view" id="view-calendar">
     <div class="calendar-container">
       <div class="cal-header">
         <div>
-          <div class="cal-title">Five week view</div>
-          <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
-            Last week · This week · Next three weeks · Mon–Sat
+          <div class="cal-title">Key Dates</div>
+          <div class="view-submeta">
+            Stage closes · Practical completion · Milestones · Hyper priorities
           </div>
         </div>
         <div class="cal-legend">
@@ -105,7 +150,7 @@
           <span><span class="swatch sand"></span> Design Support</span>
         </div>
       </div>
-      <div class="cal-grid" id="cal-grid"></div>
+      <div class="key-dates" id="key-dates"></div>
     </div>
   </section>
 
@@ -209,12 +254,16 @@
   <section class="view" id="view-todo">
     <div class="todo-header">
       <div>
-        <div class="cal-title">Studio To-Do Board</div>
-        <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-top: 6px;">
-          One column per person · Drag tasks to reorder · Tick to complete · 2h / 4h / day blocks only
+        <div class="cal-title" id="todo-view-title">My Tasks</div>
+        <div class="view-submeta" id="todo-view-sub">
+          Your list · 15 min – 1 day · Drag to reorder · Edit / double-click to change
         </div>
       </div>
       <div class="todo-tools">
+        <div class="todo-mode-toggle" role="group" aria-label="To-do view mode">
+          <button type="button" class="todo-mode-btn active" data-todo-mode="mine">My Tasks</button>
+          <button type="button" class="todo-mode-btn" data-todo-mode="studio">Studio board</button>
+        </div>
         <span class="todo-tools-label" id="todo-mode-label">Viewing as MJ · Lead permissions</span>
         <button id="todo-add-btn" class="todo-btn">+ Add Task</button>
       </div>
@@ -242,19 +291,40 @@
 
 </main>
 
-<footer>
-  <span>Made For Group · The Big Board v1.1</span>
-  <span>For internal team use · Printed weekly</span>
-  <button type="button" id="reset-demo-btn" class="reset-demo-btn">Reset demo data</button>
+<footer class="app-status">
+  <div class="status-left">
+    <span class="status-brand">Made For Group · The Big Board v1.2</span>
+    <span class="status-sep" aria-hidden="true">·</span>
+    <span class="status-hint">Press <kbd>⌘K</kbd> to search</span>
+  </div>
+  <div class="status-right">
+    <span>Internal · Printed weekly</span>
+    <button type="button" id="reset-demo-btn" class="reset-demo-btn">Reset demo data</button>
+  </div>
 </footer>
 
 </div>
 
-<!-- Add Task Modal -->
+<!-- Toasts -->
+<div class="toast-host" id="toast-host" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Command palette -->
+<div class="cmd-overlay" id="cmd-overlay" hidden>
+  <div class="cmd-palette" role="dialog" aria-modal="true" aria-label="Search the board">
+    <div class="cmd-input-row">
+      <span class="cmd-input-icon" aria-hidden="true">⌕</span>
+      <input type="text" id="cmd-input" class="cmd-input" placeholder="Jump to a view, project, or opportunity…" autocomplete="off" spellcheck="false" >
+      <kbd class="cmd-esc">esc</kbd>
+    </div>
+    <div class="cmd-results" id="cmd-results"></div>
+  </div>
+</div>
+
+<!-- Add / Edit Task Modal -->
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal">
     <div class="modal-header">
-      <h3>Add Task</h3>
+      <h3 id="modal-title">Add Task</h3>
       <button id="modal-close" class="modal-close">×</button>
     </div>
     <div class="modal-body">
@@ -268,21 +338,30 @@
       <textarea id="m-desc" class="m-input" rows="3" maxlength="400" placeholder="What needs doing?"></textarea>
       <div class="m-word-count"><span id="m-words">0</span> / 50 words</div>
 
-      <label class="m-label">Time block</label>
-      <div class="m-block-picker" id="m-blocks">
-        <button data-block="2h" class="m-block">2 hours</button>
-        <button data-block="4h" class="m-block">4 hours</button>
-        <button data-block="day" class="m-block">Whole day (8h)</button>
+      <label class="m-label">Duration <span class="m-hint">(15 min – 1 day)</span></label>
+      <div class="m-block-picker m-duration-picker" id="m-blocks">
+        <button type="button" data-mins="15" class="m-block">15m</button>
+        <button type="button" data-mins="30" class="m-block">30m</button>
+        <button type="button" data-mins="45" class="m-block">45m</button>
+        <button type="button" data-mins="60" class="m-block">1h</button>
+        <button type="button" data-mins="120" class="m-block active">2h</button>
+        <button type="button" data-mins="240" class="m-block">4h</button>
+        <button type="button" data-mins="480" class="m-block">1 day</button>
+        <button type="button" data-mins="custom" class="m-block">Custom</button>
+      </div>
+      <div id="m-custom-duration" class="m-custom-duration" style="display:none;">
+        <label class="m-label">Custom minutes</label>
+        <input type="number" id="m-mins" class="m-input" min="15" max="480" step="15" value="90" placeholder="e.g. 90">
       </div>
 
       <label class="m-label">When</label>
       <div class="m-when-picker">
-        <button data-when="week" class="m-when active">This week</button>
-        <button data-when="future" class="m-when">Future</button>
+        <button type="button" data-when="week" class="m-when active">This week</button>
+        <button type="button" data-when="future" class="m-when">Future</button>
       </div>
 
       <div id="m-multi-row" class="m-multi-row" style="display:none;">
-        <label class="m-label">Number of blocks <span class="m-hint">(multiple days)</span></label>
+        <label class="m-label">Repeat <span class="m-hint">(create N copies)</span></label>
         <input type="number" id="m-multi" class="m-input" min="1" max="10" value="1">
       </div>
     </div>
@@ -466,6 +545,7 @@
 <script src="js/aging.js"></script>
 <script src="js/print.js"></script>
 <script src="js/onboarding.js"></script>
+<script src="js/ui-chrome.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -55,4 +55,6 @@ const STORAGE_KEYS = {
   invoiceQueue: "bb_invoice_queue",
   onboarded: "bb_onboarded",
   mutations: "bb_mutations",
+  todoTasks: "bb_todo_tasks",
+  todoMode: "bb_todo_mode",
 };

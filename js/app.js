@@ -25,11 +25,13 @@ const VALID_LOGIN = { user: "mitchj", pass: "123456" };
       screen.style.display = "none";
       app.classList.remove("locked");
       errorEl.textContent = "";
+      if (typeof showToast === "function") showToast("Welcome back, Mitch — board is live", { tone: "success" });
       if (typeof revealOnboarding === "function") revealOnboarding();
     } else {
       errorEl.textContent = "Incorrect username or password.";
       passInput.value = "";
       passInput.focus();
+      if (typeof showToast === "function") showToast("Sign-in failed", { tone: "danger", duration: 2200 });
     }
   });
 })();
@@ -160,92 +162,164 @@ function renderOverview() {
 }
 
 // =======================================================================
-// CALENDAR — 5 columns: prev / current / +1 / +2 / +3, Mon-Sat
+// KEY DATES — agenda of stage closes, PCs, milestones
 // =======================================================================
-function renderCalendar() {
-  const grid = document.getElementById("cal-grid");
-  grid.innerHTML = "";
+function collectKeyDates() {
+  const items = [];
 
-  const weeks = [-1, 0, 1, 2, 3].map(offset => {
-    const monday = addDays(WEEK_MONDAY, offset * 7);
-    return {
-      offset,
-      monday,
-      classes: offset === -1 ? "week-col previous" : offset === 0 ? "week-col current" : "week-col",
-    };
+  PROJECTS.forEach(p => {
+    const title = (p.name || p.blurb || p.code || "").split(" — ")[0];
+    const stageLabel = STAGES[p.stage] ? STAGES[p.stage].label : p.stage;
+    const color = STAGES[p.stage] ? STAGES[p.stage].color : "";
+
+    if (p.stageClose) {
+      items.push({
+        date: p.stageClose,
+        type: "stage_close",
+        typeLabel: "Stage close",
+        code: p.code,
+        title,
+        lead: p.lead,
+        stage: p.stage,
+        stageLabel,
+        color,
+        hyper: !!p.hyper,
+        project: p,
+      });
+    }
+
+    const pc = p.pcDate || p.completion;
+    if (pc) {
+      items.push({
+        date: pc,
+        type: "pc",
+        typeLabel: p.stage === "support" ? "Practical completion" : "Forecast PC",
+        code: p.code,
+        title,
+        lead: p.lead,
+        stage: p.stage,
+        stageLabel,
+        color,
+        hyper: !!p.hyper,
+        project: p,
+      });
+    }
+
+    (p.dueDates || []).forEach(m => {
+      if (!m.date) return;
+      items.push({
+        date: m.date,
+        type: "milestone",
+        typeLabel: m.label || "Milestone",
+        code: p.code,
+        title,
+        lead: p.lead,
+        stage: p.stage,
+        stageLabel,
+        color,
+        hyper: !!p.hyper,
+        project: p,
+      });
+    });
   });
 
-  weeks.forEach(week => {
-    const col = document.createElement("div");
-    col.className = week.classes;
+  items.sort((a, b) => a.date.localeCompare(b.date) || a.code.localeCompare(b.code));
+  return items;
+}
 
-    const sat = addDays(week.monday, 5);
-    col.innerHTML = `
-      <div class="week-label">
-        <span>${week.offset === -1 ? "Last week" : week.offset === 0 ? "This week" : `+${week.offset} week`}</span>
-        <span class="wk-num">${fmtDayMonth(fmtISO(week.monday))} – ${fmtDayMonth(fmtISO(sat))}</span>
+function keyDateBucket(iso) {
+  const d = parseISO(iso);
+  const thisWeekEnd = addDays(WEEK_MONDAY, 6);
+  const nextTwoEnd = addDays(WEEK_MONDAY, 20);
+  if (d < WEEK_MONDAY) return "past";
+  if (d <= thisWeekEnd) return "this";
+  if (d <= nextTwoEnd) return "next";
+  return "later";
+}
+
+function renderCalendar() {
+  renderKeyDates();
+}
+
+function renderKeyDates() {
+  const root = document.getElementById("key-dates");
+  if (!root) return;
+
+  const all = collectKeyDates();
+  const buckets = {
+    past: { label: "Overdue / earlier", items: [] },
+    this: { label: "This week", items: [] },
+    next: { label: "Next two weeks", items: [] },
+    later: { label: "Later", items: [] },
+  };
+
+  all.forEach(item => {
+    buckets[keyDateBucket(item.date)].items.push(item);
+  });
+
+  const order = ["this", "next", "later", "past"];
+  const sections = order.filter(k => buckets[k].items.length);
+
+  if (!sections.length) {
+    root.innerHTML = `<div class="empty-state">No key dates on the board yet.</div>`;
+    return;
+  }
+
+  root.innerHTML = sections.map(key => {
+    const sec = buckets[key];
+    return `
+      <div class="kd-section${key === "past" ? " kd-past" : ""}${key === "this" ? " kd-this" : ""}">
+        <div class="kd-section-head">
+          <span>${sec.label}</span>
+          <span class="kd-count">${sec.items.length}</span>
+        </div>
+        <div class="kd-list">
+          ${sec.items.map(item => `
+            <button type="button" class="kd-row${item.hyper ? " hyper" : ""}" data-project-id="${item.project.id}">
+              <div class="kd-date">
+                <span class="kd-dow">${DOW_FULL_7[(parseISO(item.date).getDay() + 6) % 7]}</span>
+                <span class="kd-daynum">${fmtDayMonth(item.date)}</span>
+              </div>
+              <div class="kd-body">
+                <div class="kd-top">
+                  <span class="kd-code">${escapeHtml(item.code)}</span>
+                  <span class="kd-type">${escapeHtml(item.typeLabel)}</span>
+                  ${item.hyper ? `<span class="kd-hyper">Hyper</span>` : ""}
+                </div>
+                <div class="kd-title">${escapeHtml(item.title)}</div>
+                <div class="kd-meta">
+                  <span class="kd-swatch ${item.color}"></span>
+                  ${escapeHtml(item.stageLabel)} · Lead ${escapeHtml(item.lead)}
+                </div>
+              </div>
+            </button>
+          `).join("")}
+        </div>
       </div>
     `;
+  }).join("");
 
-    for (let i = 0; i < 6; i++) {
-      const day = addDays(week.monday, i);
-      const dayISO = fmtISO(day);
-      const dayProjects = projectsForDay(dayISO);
-      const dayMilestones = milestonesForDay(dayISO);
-
-      const isToday = dayISO === fmtISO(TODAY);
-      const dayRow = document.createElement("div");
-      dayRow.className = "day-row" + (isToday ? " today" : "");
-      dayRow.innerHTML = `
-        <div class="day-label">${DOW[i]}<span class="num">${day.getDate()}</span></div>
-        <div class="day-content">
-          ${dayMilestones.map(m => `<div class="milestone">${escapeHtml(m.label)} · ${m.code}</div>`).join("")}
-          ${dayProjects.map(p => renderChip(p, week.offset)).join("")}
-        </div>
-      `;
-      // attach hover for each chip
-      dayRow.querySelectorAll(".chip").forEach((chipEl, idx) => {
-        const p = dayProjects[idx];
-        chipEl.addEventListener("mouseenter", e => showTooltip(e, p));
-        chipEl.addEventListener("mousemove", moveTooltip);
-        chipEl.addEventListener("mouseleave", hideTooltip);
-      });
-
-      col.appendChild(dayRow);
-    }
-
-    grid.appendChild(col);
+  root.querySelectorAll(".kd-row").forEach(row => {
+    const p = PROJECTS.find(pp => pp.id === row.dataset.projectId);
+    if (!p) return;
+    row.addEventListener("mouseenter", e => showTooltip(e, p));
+    row.addEventListener("mousemove", moveTooltip);
+    row.addEventListener("mouseleave", hideTooltip);
+    row.addEventListener("click", () => {
+      const view = p.stage === "opportunity" ? "opportunities"
+        : p.stage === "support" ? "support"
+        : "projects";
+      if (typeof navigateToView === "function") navigateToView(view);
+    });
   });
 }
 
-function renderChip(p, weekOffset) {
-  const color = STAGES[p.stage].color;
-  const teamInitials = (p.team || []).map(t => TEAM_INITIALS[t]).filter(Boolean).join(" ");
-  const continueArrow = projectContinuesPast(p, weekOffset) ? `<span class="continuation">→</span>` : "";
-  return `
-    <div class="chip ${color}${p.hyper ? " hyper" : ""}">
-      <span class="code">${p.code} · ${p.lead}</span>
-      ${teamInitials ? `<div class="people">${teamInitials}</div>` : ""}
-      ${continueArrow}
-    </div>
-  `;
-}
-
-// Pull projects that have ANY activity that day — simplified: show projects
-// whose stage-close date falls inside the week of that day, OR have a
-// milestone on that day. Design Support projects show on their PC date only.
+// Legacy helpers kept for Design Support / any residual callers
 function projectsForDay(dayISO) {
-  const day = parseISO(dayISO);
-  const weekStart = mondayOf(day);
-  const weekEnd = addDays(weekStart, 5);
   const list = [];
   PROJECTS.forEach(p => {
-    if (p.stage === "support") return; // shown in DS view only
-    if (p.stageClose) {
-      const close = parseISO(p.stageClose);
-      // Render in the day matching the stageClose
-      if (fmtISO(close) === dayISO) list.push(p);
-    }
+    if (p.stage === "support") return;
+    if (p.stageClose && p.stageClose === dayISO) list.push(p);
   });
   return list;
 }
@@ -258,14 +332,6 @@ function milestonesForDay(dayISO) {
     });
   });
   return list;
-}
-
-function projectContinuesPast(p, weekOffset) {
-  if (weekOffset !== 3) return false;
-  if (!p.completion) return false;
-  const compDate = parseISO(p.completion);
-  const endOfWindow = addDays(WEEK_MONDAY, 4 * 7 - 1);
-  return compDate > endOfWindow;
 }
 
 // =======================================================================
@@ -344,6 +410,9 @@ function renderOpportunities() {
             entityType: "opportunity", entityId: p.id, action: "heat_change",
             field: "heat", from: prev, to: p.heat
           });
+        }
+        if (typeof showToast === "function" && prev !== p.heat) {
+          showToast(`${p.code} → ${HEAT_LABELS[p.heat] || p.heat}`, { tone: "neutral", duration: 2000 });
         }
         renderOpportunities();
         renderOverview();
@@ -587,6 +656,7 @@ function initOppModal() {
     renderOverview();
     renderProjects();
     renderPeople();
+    if (typeof showToast === "function") showToast(`Opportunity added · ${newOpp.code}`, { tone: "success" });
   });
 }
 
@@ -743,6 +813,9 @@ function initWonModal() {
     renderPeople();
     renderCalendar();
     renderDesignSupport();
+    if (typeof showToast === "function") {
+      showToast(`Won · converted to ${_wmOpp.code}`, { tone: "success" });
+    }
     // Bounce to projects tab
     document.querySelectorAll("#nav button").forEach(b => b.classList.remove("active"));
     document.querySelector('#nav button[data-view="projects"]').classList.add("active");
@@ -935,17 +1008,15 @@ function buildMiniCal(monthStart, projects) {
 
 // =======================================================================
 // TO-DO BOARD
-// Kanban columns per person. Sections: This Week (prominent) + Future (drawer).
-// Drag to reorder within a list. Drag across lists to reassign.
-// Leads (initials in LEADS) can edit anyone. Non-leads can only edit own.
-// All state in memory only — resets on reload.
+// Minutes as source of truth (15–480). My Tasks (default) + Studio board.
+// Personal tasks: project === null.
 // =======================================================================
 
-// "Current user" for the demo — defaults to MJ (a lead) so all controls are visible.
 const CURRENT_USER = "MJ";
+const TASK_MIN_MINUTES = 15;
+const TASK_MAX_MINUTES = 480; // 1 day
+const DURATION_PRESETS = [15, 30, 45, 60, 120, 240, 480];
 
-// People on the board: leads + general team
-// Each gets a column with This Week + Future tasks
 const BOARD_PEOPLE = [
   ...Object.keys(LEADS).map(initials => ({
     key: initials,
@@ -965,89 +1036,167 @@ const BOARD_PEOPLE = [
   })),
 ];
 
-// Sample tasks. Each: id, person (initials key), project (id), desc, hours, week|future
 let nextTaskId = 1000;
-function makeTask(person, project, desc, hours, when) {
-  return { id: "T" + (++nextTaskId), person, project, desc, hours, when, completed: false };
+let TODO_MODE = "mine"; // "mine" | "studio"
+
+function clampTaskMinutes(mins) {
+  const n = Math.round(Number(mins) || 0);
+  if (n < TASK_MIN_MINUTES) return TASK_MIN_MINUTES;
+  if (n > TASK_MAX_MINUTES) return TASK_MAX_MINUTES;
+  return n;
 }
 
-// Seed sample data so the board feels real
-const TODO_TASKS = [
-  // MJ
-  makeTask("MJ", "P01", "Lock test-fit option C with the client board ahead of Wednesday pitch deadline", 2, "week"),
-  makeTask("MJ", "P03", "Hospitality group strategic positioning — refine narrative slide", 4, "week"),
-  makeTask("MJ", "P02", "Sign off Sydney CBD RFP fee schedule with CF", 2, "week"),
-  makeTask("MJ", "P03", "Brisbane site visit prep, brief Emma on key questions", 2, "future"),
+function fmtDuration(mins) {
+  const m = clampTaskMinutes(mins);
+  if (m < 60) return m + "m";
+  if (m === 480) return "1 day";
+  if (m % 60 === 0) return (m / 60) + "h";
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return h + "h " + rem + "m";
+}
 
-  // GC
-  makeTask("GC", "P17", "CITIC House — final services coordination markup, issue to BT", 4, "week"),
-  makeTask("GC", "P17", "CITIC tender issue — reviewer sign-off pass", 4, "week"),
-  makeTask("GC", "P08", "Cbus 435 — scheme C drawing pack review", 2, "week"),
-  makeTask("GC", "P15", "Carlton cafe — review BT joinery detail responses", 2, "week"),
-  makeTask("GC", "P04", "Collingwood warehouse — call with heritage consultant", 2, "future"),
+function fmtHoursTotal(mins) {
+  const hours = mins / 60;
+  if (Number.isInteger(hours)) return hours + "h";
+  const rounded = Math.round(hours * 10) / 10;
+  return rounded + "h";
+}
 
-  // MN — has the hyper boutique hotel
-  makeTask("MN", "P01", "Boutique hotel Fitzroy — finalise test-fit C layout drawings", 8, "week"),
-  makeTask("MN", "P01", "Pitch deck narrative pass — client board context", 4, "week"),
-  makeTask("MN", "P23", "Brighton tender — joinery package coordination meeting prep", 2, "week"),
-  makeTask("MN", "P14", "Cremorne concept pack — final review before issue", 2, "week"),
-  makeTask("MN", "P29", "Docklands — defects walkthrough scheduling", 2, "future"),
+function makeTask(person, project, desc, minutes, when) {
+  return {
+    id: "T" + (++nextTaskId),
+    person,
+    project: project || null,
+    desc,
+    minutes: clampTaskMinutes(minutes),
+    when,
+    completed: false,
+  };
+}
 
-  // CF
-  makeTask("CF", "P02", "Sydney CBD RFP — concept boards page layout", 8, "week"),
-  makeTask("CF", "P02", "RFP fee schedule final check", 2, "week"),
-  makeTask("CF", "P20", "Corporate HQ tender — joinery details internal review prep", 4, "week"),
+function seedTodoTasks() {
+  return [
+    makeTask("MJ", "P01", "Lock test-fit option C with the client board ahead of Wednesday pitch deadline", 120, "week"),
+    makeTask("MJ", "P03", "Hospitality group strategic positioning — refine narrative slide", 240, "week"),
+    makeTask("MJ", "P02", "Sign off Sydney CBD RFP fee schedule with CF", 90, "week"),
+    makeTask("MJ", null, "Book Monday leads sync and send agenda", 30, "week"),
+    makeTask("MJ", "P03", "Brisbane site visit prep, brief Emma on key questions", 120, "future"),
 
-  // KM
-  makeTask("KM", "P11", "Surry Hills co-working — lighting concept workshop facilitation", 4, "week"),
-  makeTask("KM", "P19", "Hotel guest room FF&E schedule completion", 4, "week"),
-  makeTask("KM", "P06", "Childcare centre — concept narrative draft", 2, "future"),
+    makeTask("GC", "P17", "CITIC House — final services coordination markup, issue to BT", 240, "week"),
+    makeTask("GC", "P17", "CITIC tender issue — reviewer sign-off pass", 240, "week"),
+    makeTask("GC", "P08", "Cbus 435 — scheme C drawing pack review", 120, "week"),
+    makeTask("GC", "P15", "Carlton cafe — review BT joinery detail responses", 90, "week"),
+    makeTask("GC", "P04", "Collingwood warehouse — call with heritage consultant", 45, "future"),
 
-  // KP
-  makeTask("KP", "P09", "Toorak residence — joinery elevations final pass", 4, "week"),
-  makeTask("KP", "P16", "Luxury retail — VIP suite material direction", 4, "week"),
-  makeTask("KP", "P22", "Beauty salon Site B — variation drawings", 2, "week"),
+    makeTask("MN", "P01", "Boutique hotel Fitzroy — finalise test-fit C layout drawings", 480, "week"),
+    makeTask("MN", "P01", "Pitch deck narrative pass — client board context", 240, "week"),
+    makeTask("MN", "P23", "Brighton tender — joinery package coordination meeting prep", 120, "week"),
+    makeTask("MN", "P14", "Cremorne concept pack — final review before issue", 90, "week"),
+    makeTask("MN", "P29", "Docklands — defects walkthrough scheduling", 60, "future"),
 
-  // ZW
-  makeTask("ZW", "P05", "Wellness flagship mood board final pass", 2, "week"),
-  makeTask("ZW", "P18", "South Melb apartment — engineer drawing coordination", 4, "week"),
-  makeTask("ZW", "P10", "South Yarra restaurant — workshop 02 prep", 2, "week"),
+    makeTask("CF", "P02", "Sydney CBD RFP — concept boards page layout", 480, "week"),
+    makeTask("CF", "P02", "RFP fee schedule final check", 120, "week"),
+    makeTask("CF", "P20", "Corporate HQ tender — joinery details internal review prep", 240, "week"),
 
-  // LP
-  makeTask("LP", "P13", "Bath-house pool hall — structural meeting prep", 4, "week"),
-  makeTask("LP", "P07", "Project Mood scope confirmation call", 2, "week"),
-  makeTask("LP", "P21", "Wine bar Fitzroy — permit package final check", 2, "week"),
+    makeTask("KM", "P11", "Surry Hills co-working — lighting concept workshop facilitation", 240, "week"),
+    makeTask("KM", "P19", "Hotel guest room FF&E schedule completion", 240, "week"),
+    makeTask("KM", "P06", "Childcare centre — concept narrative draft", 120, "future"),
 
-  // Team members
-  makeTask("SW", "P14", "Cremorne concept pack — final drawing assembly", 4, "week"),
-  makeTask("SW", "P01", "Boutique hotel — test-fit C drafting support", 8, "week"),
-  makeTask("SW", "P09", "Toorak — joinery elevation drafting", 4, "future"),
+    makeTask("KP", "P09", "Toorak residence — joinery elevations final pass", 240, "week"),
+    makeTask("KP", "P16", "Luxury retail — VIP suite material direction", 240, "week"),
+    makeTask("KP", "P22", "Beauty salon Site B — variation drawings", 120, "week"),
 
-  makeTask("PN", "P11", "Surry Hills lighting — schematic markup", 4, "week"),
-  makeTask("PN", "P02", "Sydney CBD RFP — render setup", 4, "week"),
-  makeTask("PN", "P20", "Corporate HQ — ceiling detail coordination", 2, "future"),
+    makeTask("ZW", "P05", "Wellness flagship mood board final pass", 90, "week"),
+    makeTask("ZW", "P18", "South Melb apartment — engineer drawing coordination", 240, "week"),
+    makeTask("ZW", "P10", "South Yarra restaurant — workshop 02 prep", 120, "week"),
 
-  makeTask("BT", "P17", "CITIC House — final markup applied to drawings", 8, "week"),
-  makeTask("BT", "P17", "Tender issue checklist final pass", 4, "week"),
-  makeTask("BT", "P04", "Collingwood warehouse — existing conditions audit pack", 2, "week"),
+    makeTask("LP", "P13", "Bath-house pool hall — structural meeting prep", 240, "week"),
+    makeTask("LP", "P07", "Project Mood scope confirmation call", 45, "week"),
+    makeTask("LP", "P21", "Wine bar Fitzroy — permit package final check", 120, "week"),
 
-  makeTask("IA", "P10", "South Yarra — material direction boards prep", 4, "week"),
-  makeTask("IA", "P05", "Wellness flagship — image research", 2, "week"),
-  makeTask("IA", "P25", "Prahran restaurant — site walk Tuesday", 2, "week"),
+    makeTask("SW", "P14", "Cremorne concept pack — final drawing assembly", 240, "week"),
+    makeTask("SW", "P01", "Boutique hotel — test-fit C drafting support", 480, "week"),
+    makeTask("SW", "P09", "Toorak — joinery elevation drafting", 240, "future"),
 
-  makeTask("SB", "P01", "Boutique hotel — competitor research summary", 2, "week"),
-  makeTask("SB", "P16", "Retail flagship — VIP suite reference imagery", 4, "week"),
-  makeTask("SB", "P28", "Hawthorn spa — tile setting-out site review", 2, "future"),
+    makeTask("PN", "P11", "Surry Hills lighting — schematic markup", 240, "week"),
+    makeTask("PN", "P02", "Sydney CBD RFP — render setup", 240, "week"),
+    makeTask("PN", "P20", "Corporate HQ — ceiling detail coordination", 120, "future"),
 
-  makeTask("SC", "P11", "Surry Hills — DD drawing setup", 4, "week"),
-  makeTask("SC", "P19", "Hotel prototype — corridor drawing markup", 4, "week"),
+    makeTask("BT", "P17", "CITIC House — final markup applied to drawings", 480, "week"),
+    makeTask("BT", "P17", "Tender issue checklist final pass", 240, "week"),
+    makeTask("BT", "P04", "Collingwood warehouse — existing conditions audit pack", 120, "week"),
 
-  makeTask("EW", "P18", "South Melb apartment — drawing coordination", 4, "week"),
-  makeTask("EW", "P12", "North Sydney health clinic — concept research", 2, "week"),
-  makeTask("EW", "P29", "Docklands — handover photography brief", 2, "future"),
-];
+    makeTask("IA", "P10", "South Yarra — material direction boards prep", 240, "week"),
+    makeTask("IA", "P05", "Wellness flagship — image research", 90, "week"),
+    makeTask("IA", "P25", "Prahran restaurant — site walk Tuesday", 120, "week"),
 
-// Track future drawer open/closed state per person
+    makeTask("SB", "P01", "Boutique hotel — competitor research summary", 120, "week"),
+    makeTask("SB", "P16", "Retail flagship — VIP suite reference imagery", 240, "week"),
+    makeTask("SB", "P28", "Hawthorn spa — tile setting-out site review", 90, "future"),
+
+    makeTask("SC", "P11", "Surry Hills — DD drawing setup", 240, "week"),
+    makeTask("SC", "P19", "Hotel prototype — corridor drawing markup", 240, "week"),
+
+    makeTask("EW", "P18", "South Melb apartment — drawing coordination", 240, "week"),
+    makeTask("EW", "P12", "North Sydney health clinic — concept research", 120, "week"),
+    makeTask("EW", "P29", "Docklands — handover photography brief", 60, "future"),
+  ];
+}
+
+function normalizeStoredTask(t) {
+  let minutes = t.minutes;
+  if (minutes == null && t.hours != null) minutes = Math.round(Number(t.hours) * 60);
+  minutes = clampTaskMinutes(minutes || 120);
+  const idNum = parseInt(String(t.id || "").replace(/\D/g, ""), 10);
+  if (!isNaN(idNum) && idNum >= nextTaskId) nextTaskId = idNum;
+  return {
+    id: t.id || ("T" + (++nextTaskId)),
+    person: t.person,
+    project: t.project === "personal" || t.project === "" ? null : (t.project || null),
+    desc: t.desc || "",
+    minutes,
+    when: t.when === "future" ? "future" : "week",
+    completed: !!t.completed,
+  };
+}
+
+function loadTodoTasks() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.todoTasks);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) {
+        return parsed.map(normalizeStoredTask);
+      }
+    }
+  } catch (_) {}
+  return seedTodoTasks();
+}
+
+function persistTodoTasks() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.todoTasks, JSON.stringify(TODO_TASKS));
+  } catch (_) {}
+}
+
+function loadTodoMode() {
+  try {
+    const m = localStorage.getItem(STORAGE_KEYS.todoMode);
+    if (m === "studio" || m === "mine") return m;
+  } catch (_) {}
+  return "mine";
+}
+
+function persistTodoMode() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.todoMode, TODO_MODE);
+  } catch (_) {}
+}
+
+const TODO_TASKS = loadTodoTasks();
+TODO_MODE = loadTodoMode();
+
 const futureOpenState = {};
 
 function canEdit(personKey) {
@@ -1059,95 +1208,127 @@ function canEdit(personKey) {
 function tasksFor(personKey, when) {
   return TODO_TASKS.filter(t => t.person === personKey && t.when === when);
 }
+
 function weekHours(personKey) {
   const tasks = tasksFor(personKey, "week");
-  const remaining = tasks.filter(t => !t.completed).reduce((s, t) => s + t.hours, 0);
-  const total = tasks.reduce((s, t) => s + t.hours, 0);
+  const remaining = tasks.filter(t => !t.completed).reduce((s, t) => s + t.minutes, 0);
+  const total = tasks.reduce((s, t) => s + t.minutes, 0);
   return { remaining, total, completed: total - remaining };
 }
 
-// ---------- render ----------
+function setTodoMode(mode) {
+  TODO_MODE = mode === "studio" ? "studio" : "mine";
+  persistTodoMode();
+  document.querySelectorAll(".todo-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.todoMode === TODO_MODE);
+  });
+  const title = document.getElementById("todo-view-title");
+  const sub = document.getElementById("todo-view-sub");
+  if (TODO_MODE === "mine") {
+    if (title) title.textContent = "My Tasks";
+    if (sub) sub.textContent = "Your list · 15 min – 1 day · Drag to reorder · Edit / double-click to change";
+  } else {
+    if (title) title.textContent = "Studio To-Do Board";
+    if (sub) sub.textContent = "One column per person · Drag to reorder · Edit / double-click · Tick to complete";
+  }
+  renderTodoBoard();
+}
+
+function renderPersonColumn(person, board) {
+  const col = document.createElement("div");
+  col.className = "todo-col" + (person.isLead ? " is-lead" : "") + (futureOpenState[person.key] ? " future-open" : "");
+  col.dataset.personKey = person.key;
+
+  const hrs = weekHours(person.key);
+  const weekTasks = tasksFor(person.key, "week");
+  const futureTasks = tasksFor(person.key, "future");
+
+  col.innerHTML = `
+    <div class="todo-col-head">
+      <div class="todo-col-name-row">
+        <div class="todo-col-initials ${person.isLead ? "lead-badge" : ""}">${person.initials}</div>
+        <div>
+          <div class="todo-col-name">${person.name}</div>
+          <div class="todo-col-role">${person.role}${person.state ? " · " + person.state : ""}</div>
+        </div>
+      </div>
+      <div class="todo-hours-row">
+        <span class="todo-hours-label">Time remaining</span>
+        <span class="todo-hours-value">
+          ${fmtHoursTotal(hrs.remaining)}${hrs.completed > 0 ? `<span class="completed">(${fmtHoursTotal(hrs.completed)} done)</span>` : ""}
+        </span>
+      </div>
+    </div>
+
+    <div class="todo-section-label">
+      <span>This Week</span>
+      <span class="count">${weekTasks.length}</span>
+    </div>
+    <div class="todo-list" data-when="week" data-person="${person.key}"></div>
+
+    <div class="todo-future">
+      <button class="todo-future-toggle" data-person="${person.key}">
+        <span>Future · ${futureTasks.length} task${futureTasks.length === 1 ? "" : "s"}</span>
+        <span class="arrow">▾</span>
+      </button>
+      <div class="todo-future-body">
+        <div class="todo-list" data-when="future" data-person="${person.key}"></div>
+      </div>
+    </div>
+  `;
+  board.appendChild(col);
+
+  const weekListEl = col.querySelector('.todo-list[data-when="week"]');
+  const futureListEl = col.querySelector('.todo-list[data-when="future"]');
+  weekTasks.forEach(t => weekListEl.appendChild(renderTaskCard(t)));
+  futureTasks.forEach(t => futureListEl.appendChild(renderTaskCard(t)));
+
+  if (!weekTasks.length) weekListEl.classList.add("empty");
+  if (!futureTasks.length) futureListEl.classList.add("empty");
+
+  col.querySelector(".todo-future-toggle").addEventListener("click", () => {
+    futureOpenState[person.key] = !futureOpenState[person.key];
+    col.classList.toggle("future-open");
+  });
+
+  [weekListEl, futureListEl].forEach(list => {
+    list.addEventListener("dragover", handleDragOver);
+    list.addEventListener("dragleave", handleDragLeave);
+    list.addEventListener("drop", handleDrop);
+  });
+}
+
 function renderTodoBoard() {
   const board = document.getElementById("todo-board");
   if (!board) return;
   board.innerHTML = "";
+  board.classList.toggle("todo-board-mine", TODO_MODE === "mine");
+  board.classList.toggle("todo-board-studio", TODO_MODE === "studio");
 
-  // Update mode label
   const user = BOARD_PEOPLE.find(p => p.key === CURRENT_USER);
-  document.getElementById("todo-mode-label").textContent =
-    `Viewing as ${CURRENT_USER} · ${user.isLead ? "Lead permissions (can edit any column)" : "Edit own column only"}`;
+  const modeLabel = document.getElementById("todo-mode-label");
+  if (modeLabel) {
+    modeLabel.textContent = TODO_MODE === "mine"
+      ? `Signed in as ${CURRENT_USER} · Your list`
+      : `Viewing as ${CURRENT_USER} · ${user.isLead ? "Lead permissions (can edit any column)" : "Edit own column only"}`;
+  }
 
-  BOARD_PEOPLE.forEach(person => {
-    const col = document.createElement("div");
-    col.className = "todo-col" + (person.isLead ? " is-lead" : "") + (futureOpenState[person.key] ? " future-open" : "");
-    col.dataset.personKey = person.key;
-
-    const hrs = weekHours(person.key);
-    const weekTasks = tasksFor(person.key, "week");
-    const futureTasks = tasksFor(person.key, "future");
-
-    col.innerHTML = `
-      <div class="todo-col-head">
-        <div class="todo-col-name-row">
-          <div class="todo-col-initials ${person.isLead ? "lead-badge" : ""}">${person.initials}</div>
-          <div>
-            <div class="todo-col-name">${person.name}</div>
-            <div class="todo-col-role">${person.role}${person.state ? " · " + person.state : ""}</div>
-          </div>
-        </div>
-        <div class="todo-hours-row">
-          <span class="todo-hours-label">Hours remaining</span>
-          <span class="todo-hours-value">
-            ${hrs.remaining}h${hrs.completed > 0 ? `<span class="completed">(${hrs.completed}h done)</span>` : ""}
-          </span>
-        </div>
-      </div>
-
-      <div class="todo-section-label">
-        <span>This Week</span>
-        <span class="count">${weekTasks.length}</span>
-      </div>
-      <div class="todo-list" data-when="week" data-person="${person.key}"></div>
-
-      <div class="todo-future">
-        <button class="todo-future-toggle" data-person="${person.key}">
-          <span>Future · ${futureTasks.length} task${futureTasks.length === 1 ? "" : "s"}</span>
-          <span class="arrow">▾</span>
-        </button>
-        <div class="todo-future-body">
-          <div class="todo-list" data-when="future" data-person="${person.key}"></div>
-        </div>
-      </div>
-    `;
-    board.appendChild(col);
-
-    // Populate task lists
-    const weekListEl = col.querySelector('.todo-list[data-when="week"]');
-    const futureListEl = col.querySelector('.todo-list[data-when="future"]');
-    weekTasks.forEach(t => weekListEl.appendChild(renderTaskCard(t)));
-    futureTasks.forEach(t => futureListEl.appendChild(renderTaskCard(t)));
-
-    if (!weekTasks.length) weekListEl.classList.add("empty");
-    if (!futureTasks.length) futureListEl.classList.add("empty");
-
-    // Future drawer toggle
-    col.querySelector(".todo-future-toggle").addEventListener("click", () => {
-      futureOpenState[person.key] = !futureOpenState[person.key];
-      col.classList.toggle("future-open");
-    });
-
-    // Drop zones
-    [weekListEl, futureListEl].forEach(list => {
-      list.addEventListener("dragover", handleDragOver);
-      list.addEventListener("dragleave", handleDragLeave);
-      list.addEventListener("drop", handleDrop);
-    });
+  document.querySelectorAll(".todo-mode-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.todoMode === TODO_MODE);
   });
+
+  if (TODO_MODE === "mine") {
+    const me = BOARD_PEOPLE.find(p => p.key === CURRENT_USER);
+    if (me) renderPersonColumn(me, board);
+  } else {
+    BOARD_PEOPLE.forEach(person => renderPersonColumn(person, board));
+  }
 }
 
 function renderTaskCard(task) {
-  const project = PROJECTS.find(p => p.id === task.project);
-  const stageColor = project ? STAGES[project.stage].color : "";
+  const project = task.project ? PROJECTS.find(p => p.id === task.project) : null;
+  const isPersonal = !task.project;
+  const stageColor = project ? STAGES[project.stage].color : (isPersonal ? "personal" : "");
   const editable = canEdit(task.person);
 
   const card = document.createElement("div");
@@ -1155,29 +1336,36 @@ function renderTaskCard(task) {
   card.draggable = editable;
   card.dataset.taskId = task.id;
 
+  const projectLabel = isPersonal
+    ? "Personal"
+    : (project ? project.code.replace("Project ", "") : "—");
+
   card.innerHTML = `
     <div class="task-top-row">
-      <span class="task-project">${project ? project.code.replace("Project ","") : "—"}</span>
-      <span class="task-hours">${task.hours}h</span>
+      <span class="task-project${isPersonal ? " personal-chip" : ""}">${escapeHtml(projectLabel)}</span>
+      <span class="task-hours">${fmtDuration(task.minutes)}</span>
     </div>
-    <div class="task-desc" title="${escapeHtml(task.desc)}">${escapeHtml(task.desc)}</div>
+    <div class="task-desc" title="${escapeHtml(task.desc)}${editable ? " · Double-click to edit" : ""}">${escapeHtml(task.desc)}</div>
     <div class="task-bot-row">
       <label class="task-check">
         <input type="checkbox" ${task.completed ? "checked" : ""} ${editable ? "" : "disabled"}>
         ${task.completed ? "Done" : "Mark done"}
       </label>
-      ${editable ? `<button class="task-delete" title="Delete task">×</button>` : ""}
+      ${editable ? `
+        <div class="task-actions">
+          <button type="button" class="task-edit" title="Edit task">Edit</button>
+          <button type="button" class="task-delete" title="Delete task">×</button>
+        </div>
+      ` : ""}
     </div>
   `;
 
-  // Tooltip on hover (project context)
-  card.addEventListener("mouseenter", e => {
-    if (project) showTooltip(e, project);
-  });
-  card.addEventListener("mousemove", moveTooltip);
-  card.addEventListener("mouseleave", hideTooltip);
+  if (project) {
+    card.addEventListener("mouseenter", e => showTooltip(e, project));
+    card.addEventListener("mousemove", moveTooltip);
+    card.addEventListener("mouseleave", hideTooltip);
+  }
 
-  // Drag
   if (editable) {
     card.addEventListener("dragstart", e => {
       hideTooltip();
@@ -1188,16 +1376,30 @@ function renderTaskCard(task) {
     card.addEventListener("dragend", () => card.classList.remove("dragging"));
   }
 
-  // Tick
   const checkbox = card.querySelector('input[type="checkbox"]');
   if (editable) {
     checkbox.addEventListener("change", e => {
       e.stopPropagation();
       task.completed = checkbox.checked;
+      persistTodoTasks();
       renderTodoBoard();
     });
   }
-  // Delete
+
+  function openEdit(e) {
+    if (e) e.stopPropagation();
+    hideTooltip();
+    if (typeof openTodoEditModal === "function") openTodoEditModal(task);
+  }
+  const editBtn = card.querySelector(".task-edit");
+  if (editBtn) {
+    editBtn.addEventListener("click", openEdit);
+    editBtn.addEventListener("mousedown", e => e.stopPropagation());
+  }
+  if (editable) {
+    card.querySelector(".task-desc").addEventListener("dblclick", openEdit);
+  }
+
   const deleteBtn = card.querySelector(".task-delete");
   if (deleteBtn) {
     deleteBtn.addEventListener("click", e => {
@@ -1205,7 +1407,9 @@ function renderTaskCard(task) {
       if (confirm("Delete this task?")) {
         const idx = TODO_TASKS.findIndex(t => t.id === task.id);
         if (idx > -1) TODO_TASKS.splice(idx, 1);
+        persistTodoTasks();
         renderTodoBoard();
+        if (typeof showToast === "function") showToast("Task deleted", { tone: "neutral", duration: 2000 });
       }
     });
   }
@@ -1213,7 +1417,6 @@ function renderTaskCard(task) {
   return card;
 }
 
-// ---------- drag handlers ----------
 function handleDragOver(e) {
   e.preventDefault();
   const list = e.currentTarget;
@@ -1225,22 +1428,19 @@ function handleDragOver(e) {
   e.dataTransfer.dropEffect = "move";
   list.classList.add("drop-target");
 
-  // Find where to drop based on Y position
   const dragging = document.querySelector(".task-card.dragging");
   if (!dragging) return;
   const after = getDragAfterElement(list, e.clientY);
-  if (after == null) {
-    list.appendChild(dragging);
-  } else {
-    list.insertBefore(dragging, after);
-  }
+  if (after == null) list.appendChild(dragging);
+  else list.insertBefore(dragging, after);
 }
+
 function handleDragLeave(e) {
-  // Only clear when leaving the list itself, not its children
   if (!e.currentTarget.contains(e.relatedTarget)) {
     e.currentTarget.classList.remove("drop-target");
   }
 }
+
 function handleDrop(e) {
   e.preventDefault();
   const list = e.currentTarget;
@@ -1253,18 +1453,15 @@ function handleDrop(e) {
   const task = TODO_TASKS.find(t => t.id === taskId);
   if (!task) return;
 
-  // Update task person/when
   task.person = personKey;
   task.when = when;
 
-  // Reorder in the array based on the DOM order now created
   const newOrder = [...list.querySelectorAll(".task-card")].map(el => el.dataset.taskId);
-  // Pull all tasks for this person+when, reorder them to match newOrder
   const otherTasks = TODO_TASKS.filter(t => !(t.person === personKey && t.when === when));
   const reorderedHere = newOrder.map(id => TODO_TASKS.find(t => t.id === id)).filter(Boolean);
   TODO_TASKS.length = 0;
   TODO_TASKS.push(...otherTasks, ...reorderedHere);
-
+  persistTodoTasks();
   renderTodoBoard();
 }
 
@@ -1281,100 +1478,184 @@ function getDragAfterElement(container, y) {
 }
 
 // =======================================================================
-// ADD TASK MODAL
+// ADD / EDIT TASK MODAL
 // =======================================================================
+let openTodoEditModal = null;
+
 function initTodoModal() {
   const overlay = document.getElementById("modal-overlay");
   const addBtn = document.getElementById("todo-add-btn");
   const closeBtn = document.getElementById("modal-close");
   const cancelBtn = document.getElementById("m-cancel");
   const saveBtn = document.getElementById("m-save");
+  const titleEl = document.getElementById("modal-title");
   const personSel = document.getElementById("m-person");
   const projectSel = document.getElementById("m-project");
   const descEl = document.getElementById("m-desc");
   const wordsEl = document.getElementById("m-words");
-  const blockButtons = document.querySelectorAll(".m-block");
+  const blockButtons = document.querySelectorAll("#m-blocks .m-block");
   const whenButtons = document.querySelectorAll(".m-when");
   const multiRow = document.getElementById("m-multi-row");
   const multiInput = document.getElementById("m-multi");
+  const customRow = document.getElementById("m-custom-duration");
+  const minsInput = document.getElementById("m-mins");
 
-  let selectedBlock = "2h";
+  let selectedMinutes = 120;
   let selectedWhen = "week";
+  let editingTaskId = null;
+  let usingCustom = false;
 
-  // Populate person dropdown (leads can pick anyone; non-leads only themselves)
   const user = BOARD_PEOPLE.find(p => p.key === CURRENT_USER);
   const allowedPeople = user.isLead ? BOARD_PEOPLE : [user];
   personSel.innerHTML = allowedPeople.map(p =>
     `<option value="${p.key}">${p.initials} · ${p.name}</option>`
   ).join("");
 
-  // Populate project dropdown
-  projectSel.innerHTML = PROJECTS.map(p =>
-    `<option value="${p.id}">${p.code} · ${escapeHtml(p.blurb.split(" — ")[0])}</option>`
-  ).join("");
+  function refreshProjectOptions() {
+    projectSel.innerHTML =
+      `<option value="">Personal (no project)</option>` +
+      PROJECTS.map(p =>
+        `<option value="${p.id}">${p.code} · ${escapeHtml(p.blurb.split(" — ")[0])}</option>`
+      ).join("");
+  }
+  refreshProjectOptions();
 
-  // Word counter
-  descEl.addEventListener("input", () => {
+  function updateWordCount() {
     const words = descEl.value.trim().split(/\s+/).filter(Boolean).length;
     wordsEl.textContent = words;
     wordsEl.parentElement.classList.toggle("over", words > 50);
-  });
+  }
+  descEl.addEventListener("input", updateWordCount);
 
-  // Block selection
+  function syncMultiVisibility() {
+    if (editingTaskId) {
+      multiRow.style.display = "none";
+      return;
+    }
+    multiRow.style.display = selectedWhen === "future" ? "block" : "none";
+  }
+
+  function paintDurationButtons() {
+    blockButtons.forEach(b => {
+      const v = b.dataset.mins;
+      if (v === "custom") {
+        b.classList.toggle("active", usingCustom);
+      } else {
+        b.classList.toggle("active", !usingCustom && Number(v) === selectedMinutes);
+      }
+    });
+    customRow.style.display = usingCustom ? "block" : "none";
+    if (usingCustom) minsInput.value = selectedMinutes;
+  }
+
+  function setMinutes(mins, custom) {
+    selectedMinutes = clampTaskMinutes(mins);
+    usingCustom = !!custom || !DURATION_PRESETS.includes(selectedMinutes);
+    paintDurationButtons();
+    syncMultiVisibility();
+  }
+
+  function setWhen(when) {
+    selectedWhen = when;
+    whenButtons.forEach(b => b.classList.toggle("active", b.dataset.when === when));
+    syncMultiVisibility();
+  }
+
   blockButtons.forEach(btn => {
     btn.addEventListener("click", () => {
-      blockButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedBlock = btn.dataset.block;
-      // Whole day = 1 only, others can be multiple
-      if (selectedBlock === "day") {
-        multiRow.style.display = "none";
-      } else if (selectedWhen === "future") {
-        multiRow.style.display = "block";
-      }
-    });
-  });
-  // Default selection
-  blockButtons[0].classList.add("active");
-
-  // When selection
-  whenButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      whenButtons.forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      selectedWhen = btn.dataset.when;
-      // Multi-block only for future + 2h/4h
-      if (selectedWhen === "future" && selectedBlock !== "day") {
-        multiRow.style.display = "block";
+      if (btn.dataset.mins === "custom") {
+        usingCustom = true;
+        selectedMinutes = clampTaskMinutes(parseInt(minsInput.value, 10) || selectedMinutes);
+        paintDurationButtons();
+        minsInput.focus();
       } else {
-        multiRow.style.display = "none";
+        setMinutes(Number(btn.dataset.mins), false);
       }
     });
   });
 
-  function openModal() {
+  minsInput.addEventListener("change", () => {
+    setMinutes(parseInt(minsInput.value, 10) || selectedMinutes, true);
+  });
+
+  whenButtons.forEach(btn => {
+    btn.addEventListener("click", () => setWhen(btn.dataset.when));
+  });
+
+  function openAddModal() {
+    editingTaskId = null;
+    titleEl.textContent = "Add Task";
+    saveBtn.textContent = "Add Task";
+    refreshProjectOptions();
     overlay.classList.add("visible");
-    // Reset
     descEl.value = "";
-    wordsEl.textContent = "0";
-    wordsEl.parentElement.classList.remove("over");
+    updateWordCount();
     multiInput.value = 1;
-    multiRow.style.display = "none";
-    blockButtons.forEach(b => b.classList.remove("active"));
-    blockButtons[0].classList.add("active");
-    selectedBlock = "2h";
-    whenButtons.forEach(b => b.classList.remove("active"));
-    whenButtons[0].classList.add("active");
-    selectedWhen = "week";
+    personSel.value = CURRENT_USER;
+    projectSel.value = "";
+    setMinutes(120, false);
+    setWhen("week");
+    descEl.focus();
   }
+
+  function openEditModal(task) {
+    if (!task || !canEdit(task.person)) return;
+    editingTaskId = task.id;
+    titleEl.textContent = "Edit Task";
+    saveBtn.textContent = "Save changes";
+    refreshProjectOptions();
+    overlay.classList.add("visible");
+
+    if (![...personSel.options].some(o => o.value === task.person)) {
+      const person = BOARD_PEOPLE.find(p => p.key === task.person);
+      if (person) {
+        const opt = document.createElement("option");
+        opt.value = person.key;
+        opt.textContent = `${person.initials} · ${person.name}`;
+        personSel.appendChild(opt);
+      }
+    }
+    personSel.value = task.person;
+
+    if (task.project && ![...projectSel.options].some(o => o.value === task.project)) {
+      const project = PROJECTS.find(p => p.id === task.project);
+      if (project) {
+        const opt = document.createElement("option");
+        opt.value = project.id;
+        opt.textContent = `${project.code} · ${project.blurb.split(" — ")[0]}`;
+        projectSel.appendChild(opt);
+      }
+    }
+    projectSel.value = task.project || "";
+
+    descEl.value = task.desc;
+    updateWordCount();
+    setMinutes(task.minutes, !DURATION_PRESETS.includes(task.minutes));
+    setWhen(task.when === "future" ? "future" : "week");
+    multiRow.style.display = "none";
+    descEl.focus();
+    descEl.setSelectionRange(descEl.value.length, descEl.value.length);
+  }
+
+  openTodoEditModal = openEditModal;
+
   function closeModal() {
     overlay.classList.remove("visible");
+    editingTaskId = null;
   }
 
-  addBtn.addEventListener("click", openModal);
+  addBtn.addEventListener("click", openAddModal);
   closeBtn.addEventListener("click", closeModal);
   cancelBtn.addEventListener("click", closeModal);
   overlay.addEventListener("click", e => { if (e.target === overlay) closeModal(); });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && overlay.classList.contains("visible")) closeModal();
+  });
+
+  document.querySelectorAll(".todo-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => setTodoMode(btn.dataset.todoMode));
+  });
 
   saveBtn.addEventListener("click", () => {
     const desc = descEl.value.trim();
@@ -1384,22 +1665,51 @@ function initTodoModal() {
       alert("Description is over the 50 word limit.");
       return;
     }
-    const blockHours = { "2h": 2, "4h": 4, "day": 8 }[selectedBlock];
-    const count = (selectedWhen === "future" && selectedBlock !== "day")
+    if (usingCustom) {
+      selectedMinutes = clampTaskMinutes(parseInt(minsInput.value, 10) || selectedMinutes);
+    }
+    const mins = clampTaskMinutes(selectedMinutes);
+    const projectVal = projectSel.value || null;
+
+    if (editingTaskId) {
+      const task = TODO_TASKS.find(t => t.id === editingTaskId);
+      if (!task) { closeModal(); return; }
+      if (!canEdit(task.person) && !canEdit(personSel.value)) return;
+
+      task.person = personSel.value;
+      task.project = projectVal;
+      task.desc = desc;
+      task.minutes = mins;
+      task.when = selectedWhen;
+      delete task.hours;
+
+      if (selectedWhen === "future") futureOpenState[personSel.value] = true;
+
+      persistTodoTasks();
+      closeModal();
+      renderTodoBoard();
+      if (typeof showToast === "function") showToast("Task updated", { tone: "success", duration: 2200 });
+      return;
+    }
+
+    const count = selectedWhen === "future"
       ? Math.max(1, parseInt(multiInput.value, 10) || 1)
       : 1;
     for (let i = 0; i < count; i++) {
-      const t = makeTask(personSel.value, projectSel.value, desc, blockHours, selectedWhen);
-      TODO_TASKS.push(t);
+      TODO_TASKS.push(makeTask(personSel.value, projectVal, desc, mins, selectedWhen));
     }
-    // If future, open that person's drawer so they can see what was added
     if (selectedWhen === "future") futureOpenState[personSel.value] = true;
+    persistTodoTasks();
     closeModal();
     renderTodoBoard();
+    if (typeof showToast === "function") {
+      showToast(count > 1 ? `${count} tasks added` : "Task added", { tone: "success", duration: 2200 });
+    }
   });
+
+  setTodoMode(TODO_MODE);
 }
 
-renderTodoBoard();
 initTodoModal();
 
 // =======================================================================
@@ -1869,6 +2179,7 @@ function initProjectModal() {
     renderOpportunities();
     renderPeople();
     renderDesignSupport();
+    if (typeof showToast === "function") showToast(`Project created · ${newProject.code}`, { tone: "success" });
   });
 }
 
