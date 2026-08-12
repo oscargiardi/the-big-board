@@ -57,4 +57,12 @@ const STORAGE_KEYS = {
   mutations: "bb_mutations",
   todoTasks: "bb_todo_tasks",
   todoMode: "bb_todo_mode",
+  keyNotes: "bb_key_notes",
+  projectHome: "bb_project_home",
 };
+
+/** Bump when demo key-note seeds change so localStorage refreshes. */
+const KEY_NOTES_SEED_VERSION = 2;
+
+/** Soft cap per attachment data URL in demo localStorage (bytes of base64 string). */
+const KEY_NOTE_ATTACHMENT_MAX_CHARS = 400000;

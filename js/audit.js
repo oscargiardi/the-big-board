@@ -14,7 +14,7 @@ function _nowISO() {
 
 /**
  * Business logic: single write path for all board changes.
- * entityType: project | opportunity | invoice | todo | allocation
+ * entityType: project | opportunity | invoice | todo | allocation | key_note
  */
 function recordChange({ entityType, entityId, action, field, from, to, who, at, meta }) {
   const entry = {

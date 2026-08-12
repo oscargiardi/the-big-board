@@ -7,7 +7,8 @@ const VIEW_META = [
   { id: "calendar", label: "Key Dates", hint: "Stage closes · PC · milestones" },
   { id: "opportunities", label: "Opportunities", hint: "Heat · forecast · pitches" },
   { id: "people", label: "People", hint: "Load · utilisation · scenario" },
-  { id: "projects", label: "Projects", hint: "Pipeline · invoice queue" },
+  { id: "project-list", label: "Projects", hint: "Project home · key notes" },
+  { id: "projects", label: "Project Progress", hint: "Pipeline · invoice queue" },
   { id: "todo", label: "To-Do Board", hint: "My tasks · studio board" },
   { id: "support", label: "Design Support", hint: "On site · PC dates" },
 ];
@@ -144,8 +145,12 @@ function initCommandPalette() {
             title: p.name || (p.blurb || "").split(" — ")[0] || p.code,
             subtitle: `${p.code} · ${stage} · Lead ${p.lead}`,
             run: () => {
-              navigateToView(p.stage === "opportunity" ? "opportunities" : p.stage === "support" ? "support" : "projects");
-              showToast(`Opened ${p.code}`, { tone: "neutral", duration: 2000 });
+              if (typeof openProjectHome === "function") {
+                openProjectHome(p.id);
+              } else {
+                navigateToView(p.stage === "opportunity" ? "opportunities" : p.stage === "support" ? "support" : "projects");
+                showToast(`Opened ${p.code}`, { tone: "neutral", duration: 2000 });
+              }
             },
           });
         }
@@ -243,10 +248,44 @@ function initViewTransitions() {
   });
 }
 
+function initNavInk() {
+  const nav = document.getElementById("nav");
+  if (!nav) return;
+
+  const ink = document.createElement("span");
+  ink.className = "nav-ink";
+  nav.appendChild(ink);
+
+  function positionInk(animate) {
+    const active = nav.querySelector("button.active");
+    if (!active) return;
+    const navRect = nav.getBoundingClientRect();
+    const btnRect = active.getBoundingClientRect();
+    if (!animate) {
+      ink.style.transition = "none";
+      ink.style.left = (btnRect.left - navRect.left + nav.scrollLeft) + "px";
+      ink.style.width = btnRect.width + "px";
+      void ink.offsetWidth;
+      ink.style.transition = "";
+    } else {
+      ink.style.left = (btnRect.left - navRect.left + nav.scrollLeft) + "px";
+      ink.style.width = btnRect.width + "px";
+    }
+  }
+
+  requestAnimationFrame(() => positionInk(false));
+  window.addEventListener("load", () => positionInk(false));
+  window.addEventListener("resize", () => positionInk(false));
+  nav.addEventListener("click", () => requestAnimationFrame(() => positionInk(true)));
+
+  window._positionNavInk = () => positionInk(true);
+}
+
 function initChrome() {
   initUserMenu();
   initCommandPalette();
   initViewTransitions();
+  initNavInk();
 }
 
 if (document.readyState === "loading") {

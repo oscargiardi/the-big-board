@@ -65,7 +65,13 @@ navButtons.forEach(btn => {
     navButtons.forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    document.getElementById("view-" + btn.dataset.view).classList.add("active");
+    const view = document.getElementById("view-" + btn.dataset.view);
+    if (view) view.classList.add("active");
+    if (btn.dataset.view === "project-list") {
+      // Always return to the list when choosing the Projects tab
+      if (typeof closeProjectHome === "function") closeProjectHome();
+      else if (typeof renderProjectList === "function") renderProjectList();
+    }
   });
 });
 
@@ -124,22 +130,22 @@ function renderOverview() {
   const hyperCount = PROJECTS.filter(p => p.hyper).length;
 
   document.getElementById("metrics").innerHTML = `
-    <div class="metric">
+    <div class="metric metric-all">
       <div class="metric-label">Live Projects</div>
       <div class="metric-value">${PROJECTS.length}</div>
       <div class="metric-sub">across all stages</div>
     </div>
-    <div class="metric">
+    <div class="metric metric-opp">
       <div class="metric-label">Opportunities</div>
       <div class="metric-value" style="color: var(--green)">${counts.opportunity}</div>
       <div class="metric-sub">pitches &amp; feasibility</div>
     </div>
-    <div class="metric">
+    <div class="metric metric-active">
       <div class="metric-label">In Design / Doc</div>
       <div class="metric-value" style="color: var(--blue)">${counts.frontend + counts.documentation}</div>
       <div class="metric-sub">${counts.frontend} FED · ${counts.documentation} DOC</div>
     </div>
-    <div class="metric">
+    <div class="metric metric-hyper">
       <div class="metric-label">Hyper Priorities</div>
       <div class="metric-value" style="color: var(--hyper)">${hyperCount}</div>
       <div class="metric-sub">needing the push</div>
@@ -148,7 +154,7 @@ function renderOverview() {
 
   const hyperList = PROJECTS.filter(p => p.hyper);
   document.getElementById("hyper-list").innerHTML = hyperList.map(p => `
-    <div class="hyper-card">
+    <div class="hyper-card" data-open-project="${p.id}" role="button" tabindex="0">
       <div class="code">${p.code} · ${STAGES[p.stage].label} · Lead ${p.lead}</div>
       <div class="title">${escapeHtml(p.blurb.split(" — ")[0])}</div>
       <div class="priority">"${escapeHtml(p.weekPriority)}"</div>
@@ -158,6 +164,14 @@ function renderOverview() {
       </div>
     </div>
   `).join("") || `<div style="font-style:italic;color:var(--muted);">No hyper priorities flagged this week.</div>`;
+  document.querySelectorAll("#hyper-list .hyper-card[data-open-project]").forEach(card => {
+    card.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (typeof openProjectHome === "function") openProjectHome(card.getAttribute("data-open-project"));
+      }
+    });
+  });
   if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
 }
 
@@ -275,7 +289,7 @@ function renderKeyDates() {
         </div>
         <div class="kd-list">
           ${sec.items.map(item => `
-            <button type="button" class="kd-row${item.hyper ? " hyper" : ""}" data-project-id="${item.project.id}">
+            <button type="button" class="kd-row${item.hyper ? " hyper" : ""}" data-open-project="${item.project.id}">
               <div class="kd-date">
                 <span class="kd-dow">${DOW_FULL_7[(parseISO(item.date).getDay() + 6) % 7]}</span>
                 <span class="kd-daynum">${fmtDayMonth(item.date)}</span>
@@ -300,17 +314,11 @@ function renderKeyDates() {
   }).join("");
 
   root.querySelectorAll(".kd-row").forEach(row => {
-    const p = PROJECTS.find(pp => pp.id === row.dataset.projectId);
+    const p = PROJECTS.find(pp => pp.id === row.getAttribute("data-open-project"));
     if (!p) return;
     row.addEventListener("mouseenter", e => showTooltip(e, p));
     row.addEventListener("mousemove", moveTooltip);
     row.addEventListener("mouseleave", hideTooltip);
-    row.addEventListener("click", () => {
-      const view = p.stage === "opportunity" ? "opportunities"
-        : p.stage === "support" ? "support"
-        : "projects";
-      if (typeof navigateToView === "function") navigateToView(view);
-    });
   });
 }
 
@@ -394,7 +402,6 @@ function renderOpportunities() {
 
   grid.innerHTML = active.map(p => renderOppCard(p)).join("") ||
     `<div style="grid-column:1/-1;font-style:italic;color:var(--muted);padding:24px;text-align:center;">No active opportunities. Add one to get started.</div>`;
-
   // Wire interactions for each card
   grid.querySelectorAll(".opp-card").forEach(card => {
     const id = card.dataset.projectId;
@@ -419,25 +426,41 @@ function renderOpportunities() {
         if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
       });
     });
-    // Value edit
+    // Value edit — inline input, no prompt()
     const valEl = card.querySelector(".opp-value-amount");
     if (valEl) {
       valEl.addEventListener("click", () => {
-        const next = prompt("Estimated value (AUD):", p.estimatedValue);
-        if (next === null) return;
-        const n = parseInt(next, 10);
-        if (!isNaN(n) && n >= 0) {
-          const prev = p.estimatedValue;
-          p.estimatedValue = n;
-          if (typeof recordChange === "function") {
-            recordChange({
-              entityType: "opportunity", entityId: p.id, action: "value_change",
-              field: "estimatedValue", from: prev, to: n
-            });
+        if (valEl.querySelector("input")) return;
+        const input = document.createElement("input");
+        input.type = "number";
+        input.className = "opp-value-input";
+        input.value = p.estimatedValue || 0;
+        input.min = "0";
+        input.step = "1000";
+        valEl.textContent = "";
+        valEl.appendChild(input);
+        input.focus();
+        input.select();
+        const commit = () => {
+          const n = parseInt(input.value, 10);
+          if (!isNaN(n) && n >= 0 && n !== p.estimatedValue) {
+            const prev = p.estimatedValue;
+            p.estimatedValue = n;
+            if (typeof recordChange === "function") {
+              recordChange({
+                entityType: "opportunity", entityId: p.id, action: "value_change",
+                field: "estimatedValue", from: prev, to: n
+              });
+            }
+            if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
           }
           renderOpportunities();
-          if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
-        }
+        };
+        input.addEventListener("blur", commit);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+          if (e.key === "Escape") { e.preventDefault(); renderOpportunities(); }
+        });
       });
     }
     // Won
@@ -446,19 +469,23 @@ function renderOpportunities() {
     });
     // Lost
     card.querySelector(".opp-action-btn.lost")?.addEventListener("click", () => {
-      if (confirm(`Mark "${p.name || p.blurb.split(" — ")[0]}" as lost?`)) {
-        p.status = "lost";
-        p.lostDate = fmtISO(new Date());
-        if (typeof recordChange === "function") {
-          recordChange({
-            entityType: "opportunity", entityId: p.id, action: "lost",
-            field: "status", from: "active", to: "lost"
-          });
-        }
-        renderOpportunities();
-        renderOverview();
-        if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
+      if (!confirm(`Mark "${p.name || p.code}" as lost?`)) return;
+      p.status = "lost";
+      p.lostDate = fmtISO(new Date());
+      if (typeof recordChange === "function") {
+        recordChange({
+          entityType: "opportunity", entityId: p.id, action: "lost",
+          field: "status", from: "active", to: "lost"
+        });
       }
+      renderOpportunities();
+      renderOverview();
+      if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
+    });
+    // Open project home (ignore interactive controls) — handled by data-open-project delegation
+    // Keep stop on heat/value/actions so they don't bubble into open.
+    card.querySelectorAll(".heat-stop, .opp-value-amount, .opp-actions").forEach(el => {
+      el.addEventListener("click", e => e.stopPropagation());
     });
   });
 
@@ -502,7 +529,7 @@ function renderOppCard(p) {
   const agingCls = typeof agingClass === "function" ? agingClass(p) : "";
   const agingChip = typeof agingChipHtml === "function" ? agingChipHtml(p) : "";
   return `
-    <article class="opp-card heat-${p.heat || "simmer"}${p.hyper ? " hyper" : ""}${agingCls ? " " + agingCls : ""}" data-project-id="${p.id}">
+    <article class="opp-card heat-${p.heat || "simmer"}${p.hyper ? " hyper" : ""}${agingCls ? " " + agingCls : ""}" data-project-id="${p.id}" data-open-project="${p.id}">
       <div class="opp-code">${p.code}${p.hyper ? " · HYPER PRIORITY" : ""}${agingChip}</div>
       <h3>${title}</h3>
       <p class="blurb">${escapeHtml(p.hoverDetail)}</p>
@@ -813,14 +840,11 @@ function initWonModal() {
     renderPeople();
     renderCalendar();
     renderDesignSupport();
+    if (typeof renderProjectList === "function") renderProjectList();
     if (typeof showToast === "function") {
       showToast(`Won · converted to ${_wmOpp.code}`, { tone: "success" });
     }
-    // Bounce to projects tab
-    document.querySelectorAll("#nav button").forEach(b => b.classList.remove("active"));
-    document.querySelector('#nav button[data-view="projects"]').classList.add("active");
-    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
-    document.getElementById("view-projects").classList.add("active");
+    navigateToView("projects");
   });
 }
 
@@ -871,6 +895,9 @@ function renderPeople() {
       el.addEventListener("mouseenter", e => showTooltip(e, p));
       el.addEventListener("mousemove", moveTooltip);
       el.addEventListener("mouseleave", hideTooltip);
+      el.addEventListener("click", () => {
+        if (typeof openProjectHome === "function") openProjectHome(p.id);
+      });
     });
     container.appendChild(row);
   });
@@ -904,6 +931,9 @@ function renderPeople() {
       el.addEventListener("mouseenter", e => showTooltip(e, p));
       el.addEventListener("mousemove", moveTooltip);
       el.addEventListener("mouseleave", hideTooltip);
+      el.addEventListener("click", () => {
+        if (typeof openProjectHome === "function") openProjectHome(p.id);
+      });
     });
     teamGrid.appendChild(row);
   });
@@ -927,7 +957,7 @@ function renderDesignSupport() {
       const weeksOut = Math.round((pc - TODAY) / (1000*60*60*24*7));
       const teamPills = (p.team || []).map(t => `<span class="initial-pill">${TEAM_INITIALS[t]}</span>`).join("");
       return `
-        <div class="ds-item ${typeof agingClass === "function" ? agingClass(p) : ""}" data-project-id="${p.id}">
+        <div class="ds-item ${typeof agingClass === "function" ? agingClass(p) : ""}" data-open-project="${p.id}">
           <div>
             <div class="ds-pc">${pc.getDate()} ${MONTHS[pc.getMonth()]}</div>
             <div class="ds-pc-sub">${pc.getFullYear()} · ${weeksOut}w</div>
@@ -945,7 +975,7 @@ function renderDesignSupport() {
     }).join("")}
   `;
   list.querySelectorAll(".ds-item").forEach(el => {
-    const p = PROJECTS.find(pp => pp.id === el.dataset.projectId);
+    const p = PROJECTS.find(pp => pp.id === el.getAttribute("data-open-project"));
     el.addEventListener("mouseenter", e => showTooltip(e, p));
     el.addEventListener("mousemove", moveTooltip);
     el.addEventListener("mouseleave", hideTooltip);
@@ -1978,16 +2008,16 @@ function renderProjectRow(p) {
   }).join("");
 
   return `
-    <div class="proj-row${hasMoved ? " moved-this-week" : ""}${agingCls ? " " + agingCls : ""}">
-      <div class="proj-identity">
+    <div class="proj-row${hasMoved ? " moved-this-week" : ""}${agingCls ? " " + agingCls : ""}" data-project-id="${p.id}">
+      <button type="button" class="proj-identity" data-open-project="${p.id}" title="Open project home">
         <div class="proj-code">${p.code}${agingChip}</div>
-        <div class="proj-name">${escapeHtml(p.name)}</div>
+        <div class="proj-name">${escapeHtml(p.name)} <span class="ph-open-hint">Open →</span></div>
         <div class="proj-client">${escapeHtml(p.client)}</div>
         <div class="proj-meta">
           <span class="initial-pill">${p.lead}</span>
           <span class="proj-team">${teamPills}</span>
         </div>
-      </div>
+      </button>
       <div class="proj-pipeline">${pipelineHtml}</div>
       <div class="proj-remaining">
         <div class="proj-remaining-label">Remaining</div>
@@ -2179,6 +2209,7 @@ function initProjectModal() {
     renderOpportunities();
     renderPeople();
     renderDesignSupport();
+    if (typeof renderProjectList === "function") renderProjectList();
     if (typeof showToast === "function") showToast(`Project created · ${newProject.code}`, { tone: "success" });
   });
 }
@@ -2243,4 +2274,11 @@ initProjectModal();
 initOppControls();
 initOppModal();
 initWonModal();
+try {
+  if (typeof initProjectHome === "function") initProjectHome();
+} catch (err) {
+  console.error("initProjectHome failed", err);
+}
 if (typeof renderWeekDelta === "function") renderWeekDelta("week-delta-list");
+// Ensure global for debugging / late handlers
+if (typeof openProjectHome === "function") window.openProjectHome = openProjectHome;
